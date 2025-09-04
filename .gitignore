@@ -1,0 +1,8 @@
+# 忽略模型和适配器等大文件目录
+Qwen2-1.5B-Instruct/
+data/qwen2-1.5b-sft-lora-adapters-bf16/
+data/qwen2-1.5b-rl-adapters/
+data/Qwen2-1.5B-Instruct-RL-eCommerce/
+data/Qwen2-1.5B-Instruct-SFT-eCommerce/
+
+

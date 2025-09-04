@@ -1,0 +1,637 @@
+[
+    {
+        "session_id": "SESSION_001",
+        "user_profile": {"user_id": "U001", "tags": ["Gamer"], "vip_level": 3},
+        "scenario": "用户查询显卡价格并与优惠券并行查询 (并行独立调用)",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "What's the current price for an NVIDIA RTX 4090? Also, check if I have any coupons available."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] price_job [HEAD] get_price_by_name(product_name='NVIDIA RTX 4090') [END] [CALL] coupon_job [HEAD] get_user_coupons(user_id='U001') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "The user has two independent requests: checking a product price and checking for coupons. I can call 'get_price_by_name' and 'get_user_coupons' in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_price_by_name", "parameters": {"product_name": "NVIDIA RTX 4090"}},
+                 {"thought": "The user has two independent requests: checking a product price and checking for coupons. I can call 'get_price_by_name' and 'get_user_coupons' in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_user_coupons", "parameters": {"user_id": "U001"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_002",
+        "user_profile": {"user_id": "U002", "tags": ["Home Cook"], "vip_level": 1},
+        "scenario": "用户查询订单中商品详情 (串行依赖调用)",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Can you tell me more about the air fryer from my last order?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] order_id_job [HEAD] get_latest_order_id(user_id='U002') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "The user is asking about an item in their latest order, but hasn't specified the product ID. I must first find the latest order ID. This is a serial task.", "action_type": "TOOL_CALL", "tool_name": "get_latest_order_id", "parameters": {"user_id": "U002"}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] order_id_job [HEAD] {\"order_id\": \"ORD-2025-98777\", \"product_ids\": [\"SKU-AIRFRY-XL\"]} [END] [CALL] details_job [HEAD] get_product_details(product_id='SKU-AIRFRY-XL') [END]",
+             "assistant_actions": [
+                 {"thought": "I've received the interrupt with the latest order ID and the product ID for the air fryer. Now I can call 'get_product_details' to fulfill the user's request.", "action_type": "TOOL_CALL", "tool_name": "get_product_details", "parameters": {"product_id": "SKU-AIRFRY-XL"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_003",
+        "user_profile": {"user_id": "U003", "tags": ["Student"], "vip_level": 2},
+        "scenario": "用户筛选商品后，对缺货商品寻找替代品 (多轮依赖)",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "I need a lightweight backpack for my laptop, under $50."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] search_job [HEAD] query_products(category='backpack', tags=['lightweight', 'laptop'], max_price=50) [END] [END]",
+             "assistant_actions": [
+                 {"thought": "The user is searching for a product with specific criteria. I will use 'query_products' and wait for the results.", "action_type": "TOOL_CALL", "tool_name": "query_products", "parameters": {"category": "backpack", "tags": ["lightweight", "laptop"], "max_price": 50}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] search_job [HEAD] [{\"product_id\": \"BP-LITE-GRY\", \"name\": \"Lite-Tech Backpack Grey\"}] [END] I found the 'Lite-Tech Backpack Grey'. Should I check its availability?",
+             "assistant_actions": [
+                 {"thought": "The search returned a result. Before checking stock, I should confirm with the user if this is the product they are interested in.", "action_type": "CLARIFY"}
+             ]
+            },
+            {"turn_id": 4, "speaker": "user", "utterance": "Yes, is it in stock?"},
+            {"turn_id": 5, "speaker": "assistant", "utterance": "[CALL] stock_job [HEAD] get_stock_by_sku(sku='BP-LITE-GRY') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "User confirmed. Now I'll check the stock for the specified SKU and wait for the result.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "BP-LITE-GRY"}}
+             ]
+            },
+            {"turn_id": 6, "speaker": "assistant", "utterance": "[INTR] stock_job [HEAD] {\"stock\": 0} [END] Unfortunately, that backpack is out of stock. I am searching for similar alternatives for you now. [CALL] alt_job [HEAD] find_alternatives(sku='BP-LITE-GRY') [END]",
+             "assistant_actions": [
+                 {"thought": "The interrupt indicates the item is out of stock. The next logical step is to find alternatives. I can inform the user while the new async call executes in the background.", "action_type": "TOOL_CALL", "tool_name": "find_alternatives", "parameters": {"sku": "BP-LITE-GRY"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_004",
+        "user_profile": {"user_id": "U004", "tags": ["Remote Worker"], "vip_level": 1},
+        "scenario": "用户在一次请求中混合了多个独立任务 (并行调用)",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Hi, what's the latest order I placed? Also, check stock for the 'Ergo-Chair Pro'. And are there any coupons on my account?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] order_job [HEAD] get_latest_order_id(user_id='U004') [END] [CALL] stock_job [HEAD] get_stock_by_sku(sku='CHAIR-ERGO-PRO') [END] [CALL] coupon_job [HEAD] get_user_coupons(user_id='U004') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "The user has three independent requests: find the latest order, check stock, and get coupons. I can fire all three API calls in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_latest_order_id", "parameters": {"user_id": "U004"}},
+                 {"thought": "The user has three independent requests: find the latest order, check stock, and get coupons. I can fire all three API calls in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "CHAIR-ERGO-PRO"}},
+                 {"thought": "The user has three independent requests: find the latest order, check stock, and get coupons. I can fire all three API calls in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_user_coupons", "parameters": {"user_id": "U004"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_006",
+        "user_profile": {"user_id": "U006", "tags": ["Parent"], "vip_level": 2},
+        "scenario": "用户查询玩具详情后，再查询库存 (串行依赖)",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Tell me more about the 'LEGO Star Wars Millennium Falcon' set."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] details_job [HEAD] get_product_details(product_id='LEGO-SW-FALCON') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "The user is asking for product details. I will call 'get_product_details' with the product ID.", "action_type": "TOOL_CALL", "tool_name": "get_product_details", "parameters": {"product_id": "LEGO-SW-FALCON"}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] details_job [HEAD] {\"name\": \"Millennium Falcon\", \"pieces\": 7541, \"age\": \"16+\"} [END] The set has 7,541 pieces and is recommended for ages 16 and up. Is it in stock?",
+             "assistant_actions": [
+                 {"thought": "I have received the product details. The user's implicit next question is likely about stock. I will now call 'get_stock_by_sku'.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "LEGO-SW-FALCON"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_007",
+        "user_profile": {"user_id": "U007", "tags": ["Fashionista"], "vip_level": 4},
+        "scenario": "用户在一次请求中并行查询价格、库存和用户优惠券",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "How much is the 'Gucci Horsebit 1955' shoulder bag, is it in stock, and do I have any coupons for it?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] price_job [HEAD] get_price_by_name(product_name='Gucci Horsebit 1955') [END] [CALL] stock_job [HEAD] get_stock_by_sku(sku='GUCCI-HB-1955') [END] [CALL] coupon_job [HEAD] get_user_coupons(user_id='U007') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "The user has three parallelizable requests: price, stock, and coupons. I will issue three separate tool calls.", "action_type": "TOOL_CALL", "tool_name": "get_price_by_name", "parameters": {"product_name": "Gucci Horsebit 1955"}},
+                 {"thought": "The user has three parallelizable requests: price, stock, and coupons. I will issue three separate tool calls.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "GUCCI-HB-1955"}},
+                 {"thought": "The user has three parallelizable requests: price, stock, and coupons. I will issue three separate tool calls.", "action_type": "TOOL_CALL", "tool_name": "get_user_coupons", "parameters": {"user_id": "U007"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_009",
+        "user_profile": {"user_id": "U009", "tags": ["Athlete"], "vip_level": 3},
+        "scenario": "用户查询最新订单并发起退货流程",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "I want to return an item from my most recent order."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] order_job [HEAD] get_latest_order_id(user_id='U009') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "To initiate a return from the latest order, I must first retrieve that order's ID. This is the first step in a dependent sequence.", "action_type": "TOOL_CALL", "tool_name": "get_latest_order_id", "parameters": {"user_id": "U009"}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] order_job [HEAD] {\"order_id\": \"ORD-2025-99123\", \"items\": [{\"name\": \"Nike Air Zoom Pegasus\", \"sku\": \"NIKE-PEG-41\"}]} [END] Your last order included 'Nike Air Zoom Pegasus'. Is that the item you wish to return?",
+             "assistant_actions": [
+                 {"thought": "I have the latest order details. Since there's only one item, I will confirm with the user before calling the return tool.", "action_type": "CLARIFY"}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_012",
+        "user_profile": {"user_id": "U012", "tags": ["Photographer"], "vip_level": 5},
+        "scenario": "用户查询相机库存，然后并行查询配件",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Is the Sony A7 IV camera body in stock?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] camera_stock_job [HEAD] get_stock_by_sku(sku='SONY-A7M4-BODY') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "User is asking for stock of a specific item. I will call the stock tool and wait for the result.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "SONY-A7M4-BODY"}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] camera_stock_job [HEAD] {\"stock\": 15} [END] Yes, it's in stock! While you decide, I can check for compatible lenses and batteries for you. [CALL] lens_job [HEAD] query_products(category='camera_lens', tags=['sony', 'e-mount']) [END] [CALL] battery_job [HEAD] get_stock_by_sku(sku='SONY-NPFZ100') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "The camera is in stock. To be more helpful, I can proactively search for common accessories. Finding compatible lenses ('query_products') and checking the specific battery stock ('get_stock_by_sku') are independent tasks that can be run in parallel.", "action_type": "TOOL_CALL", "tool_name": "query_products", "parameters": {"category": "camera_lens", "tags": ["sony", "e-mount"]}},
+                 {"thought": "The camera is in stock. To be more helpful, I can proactively search for common accessories. Finding compatible lenses ('query_products') and checking the specific battery stock ('get_stock_by_sku') are independent tasks that can be run in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "SONY-NPFZ100"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_014",
+        "user_profile": {"user_id": "U014", "tags": ["Tech Enthusiast"], "vip_level": 4},
+        "scenario": "用户查询耳机库存并查询优惠券 (并行独立调用)",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Please check the stock for the Sony WH-1000XM5 headphones. Also, can you see what coupons are currently active on my account?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] stock_job [HEAD] get_stock_by_sku(sku='SONY-HDPH-XM5') [END] [CALL] coupon_job [HEAD] get_user_coupons(user_id='U014') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "The user has two distinct and independent tasks: checking stock and checking for coupons. I can execute these two API calls in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "SONY-HDPH-XM5"}},
+                 {"thought": "The user has two distinct and independent tasks: checking stock and checking for coupons. I can execute these two API calls in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_user_coupons", "parameters": {"user_id": "U014"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_015",
+        "user_profile": {"user_id": "U015", "tags": ["Frequent Shopper"], "vip_level": 5},
+        "scenario": "用户查询最新订单的物流状态 (串行依赖调用)",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Where is my latest order?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] order_id_job [HEAD] get_latest_order_id(user_id='U015') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "To get the shipping status, I first need the user's latest order ID. This requires a serial execution. I will call 'get_latest_order_id'.", "action_type": "TOOL_CALL", "tool_name": "get_latest_order_id", "parameters": {"user_id": "U015"}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] order_id_job [HEAD] {\"order_id\": \"ORD-2025-98765\"} [END] [CALL] shipping_job [HEAD] get_shipping_status(order_id='ORD-2025-98765') [END]",
+             "assistant_actions": [
+                 {"thought": "I have received the interrupt with the latest order ID 'ORD-2025-98765'. Now I can proceed with the second, dependent step: calling the 'get_shipping_status' tool with this ID.", "action_type": "TOOL_CALL", "tool_name": "get_shipping_status", "parameters": {"order_id": "ORD-2025-98765"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_016",
+        "user_profile": {"user_id": "U016", "tags": ["Book Lover"], "vip_level": 2},
+        "scenario": "用户查找商品，涉及与用户确认的中间步骤",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "I'm looking for a fantasy book, maybe something popular."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] find_book_job [HEAD] query_products(category='books', tags=['fantasy', 'bestseller']) [END] [END]",
+             "assistant_actions": [
+                 {"thought": "The user's request is general. I will use the 'query_products' tool with the category 'books' and relevant tags.", "action_type": "TOOL_CALL", "tool_name": "query_products", "parameters": {"category": "books", "tags": ["fantasy", "bestseller"]}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] find_book_job [HEAD] [{\"product_id\": \"BOOK-Tolkien-LOTR\", \"name\": \"The Lord of the Rings\"}] [END] A popular fantasy book is 'The Lord of the Rings'. Would you like to see more details about it?",
+             "assistant_actions": [
+                 {"thought": "The search returned a result. I need to confirm with the user if they are interested in this specific book before I call 'get_product_details'. This is a clarification step.", "action_type": "CLARIFY"}
+             ]
+            },
+            {"turn_id": 4, "speaker": "user", "utterance": "Yes, please show me the details."},
+            {"turn_id": 5, "speaker": "assistant", "utterance": "[CALL] details_job [HEAD] get_product_details(product_id='BOOK-Tolkien-LOTR') [END]",
+             "assistant_actions": [
+                 {"thought": "The user has confirmed their interest. I will now call 'get_product_details' with the product ID obtained from the previous interrupt.", "action_type": "TOOL_CALL", "tool_name": "get_product_details", "parameters": {"product_id": "BOOK-Tolkien-LOTR"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_017",
+        "user_profile": {"user_id": "U017", "tags": ["Home Office"], "vip_level": 3},
+        "scenario": "用户查询缺货商品并寻找替代品",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Is the Herman Miller Aeron chair in stock?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] stock_check_job [HEAD] get_stock_by_sku(sku='CHAIR-HM-AERON') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "The user is asking for the stock of a specific product. I'll call 'get_stock_by_sku' and wait for the result.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "CHAIR-HM-AERON"}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] stock_check_job [HEAD] {\"stock\": 0} [END] It seems that the Herman Miller Aeron chair is currently out of stock. While I look for some alternatives, I can also notify you when it's back in stock. [CALL] alt_job [HEAD] find_alternatives(sku='CHAIR-HM-AERON') [END]",
+             "assistant_actions": [
+                 {"thought": "The interrupt shows the item is out of stock (stock: 0). The correct next action is to call the 'find_alternatives' tool. I can also generate a helpful message to the user while the new asynchronous call is executing.", "action_type": "TOOL_CALL", "tool_name": "find_alternatives", "parameters": {"sku": "CHAIR-HM-AERON"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_019",
+        "user_profile": {"user_id": "U019", "tags": ["Developer"], "vip_level": 3},
+        "scenario": "用户查询键盘库存并查询优惠券 (并行独立调用)",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Is the Keychron K2 keyboard in stock? Also, what coupons can I use?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] stock_job [HEAD] get_stock_by_sku(sku='KEYCHRON-K2') [END] [CALL] coupon_job [HEAD] get_user_coupons(user_id='U019') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "The user has two independent tasks: checking stock and coupons. I can call 'get_stock_by_sku' and 'get_user_coupons' in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "KEYCHRON-K2"}},
+                 {"thought": "The user has two independent tasks: checking stock and coupons. I can call 'get_stock_by_sku' and 'get_user_coupons' in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_user_coupons", "parameters": {"user_id": "U019"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_020",
+        "user_profile": {"user_id": "U020", "tags": ["Chef"], "vip_level": 5},
+        "scenario": "用户查询最新订单的物流状态 (串行依赖调用)",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Can you track my latest shipment?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] order_id_job [HEAD] get_latest_order_id(user_id='U020') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "To track the shipment, I first need the latest order ID. I will call 'get_latest_order_id'.", "action_type": "TOOL_CALL", "tool_name": "get_latest_order_id", "parameters": {"user_id": "U020"}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] order_id_job [HEAD] {\"order_id\": \"ORD-2025-98766\"} [END] [CALL] shipping_job [HEAD] get_shipping_status(order_id='ORD-2025-98766') [END]",
+             "assistant_actions": [
+                 {"thought": "I have received the interrupt with the latest order ID. Now I can perform the second, dependent step: calling 'get_shipping_status' with this ID.", "action_type": "TOOL_CALL", "tool_name": "get_shipping_status", "parameters": {"order_id": "ORD-2025-98766"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_021",
+        "user_profile": {"user_id": "U021", "tags": ["Interior Designer"], "vip_level": 2},
+        "scenario": "用户查找商品，涉及与用户确认的中间步骤",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "I'm looking for a modern floor lamp."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] find_lamp_job [HEAD] query_products(category='lighting', tags=['floor_lamp', 'modern']) [END] [END]",
+             "assistant_actions": [
+                 {"thought": "The user's request is specific enough to search. I will use the 'query_products' tool and wait for the result to present options.", "action_type": "TOOL_CALL", "tool_name": "query_products", "parameters": {"category": "lighting", "tags": ["floor_lamp", "modern"]}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] find_lamp_job [HEAD] [{\"product_id\": \"LAMP-ARC-BLK\", \"name\": \"Modern Arc Floor Lamp\"}] [END] I found a 'Modern Arc Floor Lamp'. Would you like to see its specifications?",
+             "assistant_actions": [
+                 {"thought": "The search returned a result. I need to confirm with the user before calling 'get_product_details'. This is a clarification step.", "action_type": "CLARIFY"}
+             ]
+            },
+            {"turn_id": 4, "speaker": "user", "utterance": "Yes, show me the specs."},
+            {"turn_id": 5, "speaker": "assistant", "utterance": "[CALL] details_job [HEAD] get_product_details(product_id='LAMP-ARC-BLK') [END]",
+             "assistant_actions": [
+                 {"thought": "The user has confirmed. I will now call 'get_product_details' with the product ID from the previous interrupt.", "action_type": "TOOL_CALL", "tool_name": "get_product_details", "parameters": {"product_id": "LAMP-ARC-BLK"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_022",
+        "user_profile": {"user_id": "U022", "tags": ["Outdoorsman"], "vip_level": 3},
+        "scenario": "用户查询缺货商品并寻找替代品",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Do you have the 'Osprey Talon 22' backpack in stock?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] stock_check_job [HEAD] get_stock_by_sku(sku='OSPREY-TALON-22') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "User is asking for the stock of a specific product. I'll call 'get_stock_by_sku' and wait for the result.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "OSPREY-TALON-22"}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] stock_check_job [HEAD] {\"stock\": 0} [END] It appears the 'Osprey Talon 22' is out of stock. I'm searching for similar backpacks for you now. [CALL] alt_job [HEAD] find_alternatives(sku='OSPREY-TALON-22') [END]",
+             "assistant_actions": [
+                 {"thought": "The interrupt indicates the item is out of stock. The correct next action is to call 'find_alternatives'. I can also generate a helpful message while the new async call runs.", "action_type": "TOOL_CALL", "tool_name": "find_alternatives", "parameters": {"sku": "OSPREY-TALON-22"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_024",
+        "user_profile": {"user_id": "U024", "tags": ["Parent"], "vip_level": 2},
+        "scenario": "用户简单查询订单，模型直接调用工具",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Show me my last order."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] order_job [HEAD] get_latest_order_id(user_id='U024') [END]",
+             "assistant_actions": [
+                 {"thought": "The user wants to see their latest order. The most direct action is to call 'get_latest_order_id'.", "action_type": "TOOL_CALL", "tool_name": "get_latest_order_id", "parameters": {"user_id": "U024"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_025",
+        "user_profile": {"user_id": "U025", "tags": ["Coffee Lover"], "vip_level": 4},
+        "scenario": "用户查询特定品类商品",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Show me all your espresso machines."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] search_job [HEAD] query_products(category='coffee_machine', tags=['espresso']) [END]",
+             "assistant_actions": [
+                 {"thought": "User is asking to browse a category of products. 'query_products' is the appropriate tool with the category and a clarifying tag.", "action_type": "TOOL_CALL", "tool_name": "query_products", "parameters": {"category": "coffee_machine", "tags": ["espresso"]}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_026",
+        "user_profile": {"user_id": "U026", "tags": ["DIY Enthusiast"], "vip_level": 3},
+        "scenario": "用户并行查询两个不相关商品的库存",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Are the 'DeWalt 20V Drill' and the '3M N95 Mask (50-pack)' in stock?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] drill_stock [HEAD] get_stock_by_sku(sku='DEWALT-DRILL-20V') [END] [CALL] mask_stock [HEAD] get_stock_by_sku(sku='3M-MASK-N95-50PK') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "User is asking for the stock of two separate, unrelated items. I can run these 'get_stock_by_sku' calls in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "DEWALT-DRILL-20V"}},
+                 {"thought": "User is asking for the stock of two separate, unrelated items. I can run these 'get_stock_by_sku' calls in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "3M-MASK-N95-50PK"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_027",
+        "user_profile": {"user_id": "U027", "tags": ["Frequent Shopper"], "vip_level": 5},
+        "scenario": "用户在一次请求中混合了串行和并行任务",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Please check the shipping status of my latest order, and also show me your best-selling laptops."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] order_job [HEAD] get_latest_order_id(user_id='U027') [END] [CALL] laptop_job [HEAD] query_products(category='laptop', tags=['bestseller']) [END] [END]",
+             "assistant_actions": [
+                 {"thought": "This is a mixed case. Finding laptops is an independent task. Checking shipping status is a dependent task (needs order ID first). I can start both initial calls in parallel: get the order ID, and search for laptops.", "action_type": "TOOL_CALL", "tool_name": "get_latest_order_id", "parameters": {"user_id": "U027"}},
+                 {"thought": "This is a mixed case. Finding laptops is an independent task. Checking shipping status is a dependent task (needs order ID first). I can start both initial calls in parallel: get the order ID, and search for laptops.", "action_type": "TOOL_CALL", "tool_name": "query_products", "parameters": {"category": "laptop", "tags": ["bestseller"]}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] order_job [HEAD] {\"order_id\": \"ORD-2025-99456\"} [END] [CALL] shipping_job [HEAD] get_shipping_status(order_id='ORD-2025-99456') [END]",
+             "assistant_actions": [
+                 {"thought": "I've received the order ID interrupt first. I can now immediately start the dependent task of checking the shipping status. I don't need to wait for the laptop search to finish.", "action_type": "TOOL_CALL", "tool_name": "get_shipping_status", "parameters": {"order_id": "ORD-2025-99456"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_029",
+        "user_profile": {"user_id": "U029", "tags": ["Movie Fan"], "vip_level": 2},
+        "scenario": "用户查询商品详情后，继续查询库存",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "What's the runtime of 'The Dune Part Two' 4K Blu-ray?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] details_job [HEAD] get_product_details(product_id='DUNE2-4K-BR') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "User wants a specific detail about a product. I'll call 'get_product_details' and wait for the result.", "action_type": "TOOL_CALL", "tool_name": "get_product_details", "parameters": {"product_id": "DUNE2-4K-BR"}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] details_job [HEAD] {\"runtime\": \"166 minutes\"} [END] The runtime is 166 minutes. Do you want to check if it's available?",
+             "assistant_actions": [
+                 {"thought": "I've answered the user's question with the info from the interrupt. A natural follow-up is to check for stock, so I'll prompt the user for that.", "action_type": "CLARIFY"}
+             ]
+            },
+            {"turn_id": 4, "speaker": "user", "utterance": "Yes please."},
+            {"turn_id": 5, "speaker": "assistant", "utterance": "[CALL] stock_job [HEAD] get_stock_by_sku(sku='DUNE2-4K-BR') [END]",
+             "assistant_actions": [
+                 {"thought": "User confirmed. Now calling 'get_stock_by_sku'.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "DUNE2-4K-BR"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_030",
+        "user_profile": {"user_id": "U030", "tags": ["Chef"], "vip_level": 3},
+        "scenario": "用户直接请求寻找替代品",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "The Le Creuset Dutch Oven is always sold out. Can you find me some good alternatives?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] alt_job [HEAD] find_alternatives(sku='LECREUSET-DO-5QT') [END]",
+             "assistant_actions": [
+                 {"thought": "The user is directly asking for alternatives to a known product. The 'find_alternatives' tool is the perfect fit for this single-step task.", "action_type": "TOOL_CALL", "tool_name": "find_alternatives", "parameters": {"sku": "LECREUSET-DO-5QT"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_031",
+        "user_profile": {"user_id": "U031", "tags": ["Frequent Shopper"], "vip_level": 5},
+        "scenario": "用户并行查询两个有效订单的状态",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Check the shipping status for order ORD-2025-98765 and order ORD-2025-99456."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] job_1 [HEAD] get_shipping_status(order_id='ORD-2025-98765') [END] [CALL] job_2 [HEAD] get_shipping_status(order_id='ORD-2025-99456') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "User provides two order IDs to check. I will call the 'get_shipping_status' tool for both in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_shipping_status", "parameters": {"order_id": "ORD-2025-98765"}},
+                 {"thought": "User provides two order IDs to check. I will call the 'get_shipping_status' tool for both in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_shipping_status", "parameters": {"order_id": "ORD-2025-99456"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_032",
+        "user_profile": {"user_id": "U032", "tags": ["Tech Enthusiast"], "vip_level": 4},
+        "scenario": "用户使用具体参数查询笔记本电脑",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Find me a gaming laptop with an Intel Core i9 processor."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] laptop_search [HEAD] query_products(category='laptop', tags=['gaming', 'Intel Core i9']) [END]",
+             "assistant_actions": [
+                 {"thought": "The user is searching for a laptop with specific, searchable tags. I will use 'query_products' with these tags.", "action_type": "TOOL_CALL", "tool_name": "query_products", "parameters": {"category": "laptop", "tags": ["gaming", "Intel Core i9"]}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_033",
+        "user_profile": {"user_id": "U033", "tags": ["Gamer"], "vip_level": 2},
+        "scenario": "用户查询游戏价格",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "How much does 'Elden Ring' for PC cost?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] price_check [HEAD] get_price_by_name(product_name='Elden Ring PC') [END]",
+             "assistant_actions": [
+                 {"thought": "User is asking for the price of a specific game. 'get_price_by_name' is the correct tool.", "action_type": "TOOL_CALL", "tool_name": "get_price_by_name", "parameters": {"product_name": "Elden Ring PC"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_034",
+        "user_profile": {"user_id": "U034", "tags": ["Pet Owner"], "vip_level": 1},
+        "scenario": "用户搜索特定宠物用品",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Find me some grain-free cat food."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] pet_food_search [HEAD] query_products(category='pet_supplies', tags=['cat_food', 'grain-free']) [END]",
+             "assistant_actions": [
+                 {"thought": "User is looking for a product with specific attributes. 'query_products' is the appropriate tool.", "action_type": "TOOL_CALL", "tool_name": "query_products", "parameters": {"category": "pet_supplies", "tags": ["cat_food", "grain-free"]}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_035",
+        "user_profile": {"user_id": "U035", "tags": ["Home Cook"], "vip_level": 3},
+        "scenario": "用户查询厨房电器库存",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Is the KitchenAid stand mixer in red available?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] stock_query [HEAD] get_stock_by_sku(sku='KITCHENAID-MIXER-RED') [END]",
+             "assistant_actions": [
+                 {"thought": "User is asking for the stock of a specific item. I will use 'get_stock_by_sku'.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "KITCHENAID-MIXER-RED"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_036",
+        "user_profile": {"user_id": "U036", "tags": ["DIY Enthusiast"], "vip_level": 2},
+        "scenario": "用户查询工具详情",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Tell me more about the Bosch GSB 18V-55 drill."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] drill_details [HEAD] get_product_details(product_id='BOSCH-DRILL-18V55') [END]",
+             "assistant_actions": [
+                 {"thought": "User wants details about a specific product. 'get_product_details' is the correct tool to use.", "action_type": "TOOL_CALL", "tool_name": "get_product_details", "parameters": {"product_id": "BOSCH-DRILL-18V55"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_037",
+        "user_profile": {"user_id": "U037", "tags": ["Outdoorsman"], "vip_level": 4},
+        "scenario": "用户查询一个缺货商品并寻找替代品",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "The Arc'teryx Beta AR jacket is sold out. Can you find similar jackets?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] alternatives_job [HEAD] find_alternatives(sku='ARCTERYX-BETA-AR-BLK-M') [END]",
+             "assistant_actions": [
+                 {"thought": "The user explicitly states an item is sold out and asks for alternatives. The 'find_alternatives' tool is designed for this exact purpose.", "action_type": "TOOL_CALL", "tool_name": "find_alternatives", "parameters": {"sku": "ARCTERYX-BETA-AR-BLK-M"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_038",
+        "user_profile": {"user_id": "U038", "tags": ["Book Lover"], "vip_level": 3},
+        "scenario": "用户并行查询两本书的库存",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Are 'Project Hail Mary' and 'The Three-Body Problem' in stock?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] book1_stock [HEAD] get_stock_by_sku(sku='BOOK-WEIR-PHM-HC') [END] [CALL] book2_stock [HEAD] get_stock_by_sku(sku='BOOK-LIU-TBP-PB') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "User is asking for the stock of two different books. I can call 'get_stock_by_sku' for each in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "BOOK-WEIR-PHM-HC"}},
+                 {"thought": "User is asking for the stock of two different books. I can call 'get_stock_by_sku' for each in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "BOOK-LIU-TBP-PB"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_039",
+        "user_profile": {"user_id": "U039", "tags": ["Parent"], "vip_level": 1},
+        "scenario": "用户查询最新订单ID",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "I need to find my most recent order number."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] find_order [HEAD] get_latest_order_id(user_id='U039') [END]",
+             "assistant_actions": [
+                 {"thought": "The user directly asks for their latest order ID. The 'get_latest_order_id' tool is the perfect match.", "action_type": "TOOL_CALL", "tool_name": "get_latest_order_id", "parameters": {"user_id": "U039"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_040",
+        "user_profile": {"user_id": "U040", "tags": ["Student"], "vip_level": 2},
+        "scenario": "用户搜索学习用品",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Show me all your noise-cancelling headphones suitable for studying."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] headphone_search [HEAD] query_products(category='electronics', tags=['headphones', 'noise-cancelling']) [END]",
+             "assistant_actions": [
+                 {"thought": "User is searching for a product with specific features. 'query_products' is the appropriate tool to use.", "action_type": "TOOL_CALL", "tool_name": "query_products", "parameters": {"category": "electronics", "tags": ["headphones", "noise-cancelling"]}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_041",
+        "user_profile": {"user_id": "U041", "tags": ["Frequent Shopper"], "vip_level": 5},
+        "scenario": "用户直接查询优惠券",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Just show me all my available coupons."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] get_coupons [HEAD] get_user_coupons(user_id='U041') [END]",
+             "assistant_actions": [
+                 {"thought": "The user's request is a direct command to retrieve their coupons. The 'get_user_coupons' tool is the correct one to call.", "action_type": "TOOL_CALL", "tool_name": "get_user_coupons", "parameters": {"user_id": "U041"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_042",
+        "user_profile": {"user_id": "U042", "tags": ["Home Office"], "vip_level": 3},
+        "scenario": "用户查询特定订单的物流状态",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "What is the shipping status for order ORD-2025-99123?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] shipping_status_check [HEAD] get_shipping_status(order_id='ORD-2025-99123') [END]",
+             "assistant_actions": [
+                 {"thought": "The user provides a specific order ID and asks for its shipping status. I can directly call 'get_shipping_status'.", "action_type": "TOOL_CALL", "tool_name": "get_shipping_status", "parameters": {"order_id": "ORD-2025-99123"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_043",
+        "user_profile": {"user_id": "U043", "tags": ["Tech Enthusiast"], "vip_level": 4},
+        "scenario": "用户查询某产品详情",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Tell me everything about the Apple Vision Pro."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] product_details [HEAD] get_product_details(product_id='APPLE-VISION-PRO') [END]",
+             "assistant_actions": [
+                 {"thought": "The user is asking for details about a specific product. I will use the 'get_product_details' tool.", "action_type": "TOOL_CALL", "tool_name": "get_product_details", "parameters": {"product_id": "APPLE-VISION-PRO"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_044",
+        "user_profile": {"user_id": "U044", "tags": ["Gamer"], "vip_level": 3},
+        "scenario": "用户并行查询两个游戏主机的库存",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Are the PlayStation 5 and the Nintendo Switch OLED in stock?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] ps5_stock [HEAD] get_stock_by_sku(sku='SONY-PS5-DISC') [END] [CALL] switch_stock [HEAD] get_stock_by_sku(sku='NINTENDO-SWITCH-OLED') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "User is asking about the stock of two different items. I can call 'get_stock_by_sku' for each of them in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "SONY-PS5-DISC"}},
+                 {"thought": "User is asking about the stock of two different items. I can call 'get_stock_by_sku' for each of them in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_stock_by_sku", "parameters": {"sku": "NINTENDO-SWITCH-OLED"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_045",
+        "user_profile": {"user_id": "U045", "tags": ["Fashionista"], "vip_level": 5},
+        "scenario": "用户查询特定品牌和类别的商品",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "Show me all handbags from the brand Chanel."},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] search_handbags [HEAD] query_products(category='handbags', tags=['Chanel']) [END]",
+             "assistant_actions": [
+                 {"thought": "The user wants to see products of a specific category and brand. The 'query_products' tool is perfect for this.", "action_type": "TOOL_CALL", "tool_name": "query_products", "parameters": {"category": "handbags", "tags": ["Chanel"]}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_046",
+        "user_profile": {"user_id": "U046", "tags": ["Chef"], "vip_level": 4},
+        "scenario": "用户查询缺货厨具的替代品",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "I can't find the Instant Pot Duo. What are some other good pressure cookers?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] find_alternatives_job [HEAD] find_alternatives(sku='INSTANTPOT-DUO-6QT') [END]",
+             "assistant_actions": [
+                 {"thought": "The user is asking for alternatives to a specific product. The 'find_alternatives' tool is the correct one to use.", "action_type": "TOOL_CALL", "tool_name": "find_alternatives", "parameters": {"sku": "INSTANTPOT-DUO-6QT"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_047",
+        "user_profile": {"user_id": "U047", "tags": ["Remote Worker"], "vip_level": 3},
+        "scenario": "用户并行查询显示器和网络摄像头的价格",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "What's the price for the Dell UltraSharp U2723QE monitor and the Logitech C920 webcam?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] monitor_price [HEAD] get_price_by_name(product_name='Dell UltraSharp U2723QE') [END] [CALL] webcam_price [HEAD] get_price_by_name(product_name='Logitech C920') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "User wants the price for two separate items. I can call 'get_price_by_name' for both in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_price_by_name", "parameters": {"product_name": "Dell UltraSharp U2723QE"}},
+                 {"thought": "User wants the price for two separate items. I can call 'get_price_by_name' for both in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_price_by_name", "parameters": {"product_name": "Logitech C920"}}
+             ]
+            }
+        ]
+    },
+    {
+        "session_id": "SESSION_048",
+        "user_profile": {"user_id": "U048", "tags": ["Student"], "vip_level": 1},
+        "scenario": "用户查询订单详情的后续步骤",
+        "turns": [
+            {"turn_id": 1, "speaker": "user", "utterance": "What were the items in my last order?"},
+            {"turn_id": 2, "speaker": "assistant", "utterance": "[CALL] get_order [HEAD] get_latest_order_id(user_id='U048') [END] [END]",
+             "assistant_actions": [
+                 {"thought": "To list the items, I first need to retrieve the latest order itself. This is the first step.", "action_type": "TOOL_CALL", "tool_name": "get_latest_order_id", "parameters": {"user_id": "U048"}}
+             ]
+            },
+            {"turn_id": 3, "speaker": "assistant", "utterance": "[INTR] get_order [HEAD] {\"order_id\": \"ORD-2025-11223\", \"product_ids\": [\"SKU-TEXTBOOK-PHY101\", \"SKU-NOTEBOOK-5PK\"]} [END] Your last order contained two items. I will get their details now. [CALL] details_1 [HEAD] get_product_details(product_id='SKU-TEXTBOOK-PHY101') [END] [CALL] details_2 [HEAD] get_product_details(product_id='SKU-NOTEBOOK-5PK') [END]",
+             "assistant_actions": [
+                 {"thought": "The interrupt returned an order with two product IDs. To fulfill the user's request, I now need to get the details for both items. These are independent calls and can be run in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_product_details", "parameters": {"product_id": "SKU-TEXTBOOK-PHY101"}},
+                 {"thought": "The interrupt returned an order with two product IDs. To fulfill the user's request, I now need to get the details for both items. These are independent calls and can be run in parallel.", "action_type": "TOOL_CALL", "tool_name": "get_product_details", "parameters": {"product_id": "SKU-NOTEBOOK-5PK"}}
+             ]
+            }
+        ]
+    }
+]
+
