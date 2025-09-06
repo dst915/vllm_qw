@@ -26,80 +26,99 @@ class COLORS:
 # 1. 强化学习环境
 # =====================================================================================
 class EcommerceEnv:
+    """
+    MODIFIED: This version is now robust to conversations with consecutive
+    user or assistant turns by using an index to track progress.
+    """
     def __init__(self, scenarios, tokenizer):
         self.scenarios = scenarios
         self.tokenizer = tokenizer
-        self.system_prompt = self._build_system_prompt()
+        # 这些变量在 reset() 中被初始化
         self.current_trace = None
-        self.history = []
-
-    def _build_system_prompt(self):
-        # 保持和SFT阶段完全一致的系统指令
-        return """You are an intelligent e-commerce assistant... (省略，使用你SFT时的完整prompt)"""
+        self.history = None
+        self.turn_index = 0
 
     def reset(self):
-        # 随机选择一个多轮对话场景
+        """
+        随机选择一个场景，并找到第一个assistant回合的位置来初始化环境。
+        """
         self.current_trace = random.choice(self.scenarios)
-        # 初始化历史记录，包含系统指令和第一轮的用户输入
-        self.history = self.current_trace['messages'][:2] 
+        self.history = []
+        
+        # 寻找第一个 assistant 回合的索引
+        first_assistant_idx = -1
+        for i, msg in enumerate(self.current_trace['messages']):
+            if msg['role'] == 'assistant':
+                first_assistant_idx = i
+                break
+        
+        # 如果找不到assistant回合（数据格式问题），则重新随机选择
+        if first_assistant_idx == -1:
+            return self.reset()
+
+        # 初始化历史记录，包含第一个assistant回合之前的所有内容
+        self.history = self.current_trace['messages'][:first_assistant_idx]
+        self.turn_index = first_assistant_idx
+        
         return self.history
 
     def step(self, generated_json_str: str):
-        # 如果历史记录长度已经超过了标准答案的长度，说明模型生成了多余的对话，给予惩罚
-        if len(self.history) >= len(self.current_trace['messages']):
-            return self.history, -2.0, True
-
-        # 获取当前轮次的标准答案
-        golden_assistant_message = self.current_trace['messages'][len(self.history)]
+        """
+        根据模型生成的内容推进对话，并计算奖励。
+        """
+        # 获取当前指针位置的“黄金标准答案”
+        golden_assistant_message = self.current_trace['messages'][self.turn_index]
         golden_json_str = golden_assistant_message['content']
         
         # 计算奖励
         reward = self.get_reward(generated_json_str, golden_json_str)
         
-        # 将模型的生成结果加入历史
+        # 将模型的生成结果（实际行为）加入历史
         self.history.append({"role": "assistant", "content": generated_json_str})
         
-        # 判断对话是否结束
-        done = len(self.history) >= len(self.current_trace['messages'])
+        # --- 核心修改逻辑：智能地寻找下一个用户回合 ---
+        # 从当前标准答案之后开始，寻找下一个assistant回合
+        next_assistant_idx = -1
+        for i in range(self.turn_index + 1, len(self.current_trace['messages'])):
+            message = self.current_trace['messages'][i]
+            # 把所有遇到的user回合都加入历史
+            if message['role'] == 'user':
+                self.history.append(message)
+            # 找到第一个assistant回合就停止
+            elif message['role'] == 'assistant':
+                next_assistant_idx = i
+                break
         
-        if not done:
-            # 如果没结束，自动加入下一轮用户的发言
-            self.history.append(self.current_trace['messages'][len(self.history)])
+        # 如果找到了下一个assistant回合
+        if next_assistant_idx != -1:
+            self.turn_index = next_assistant_idx
+            done = False
+        else:
+            # 如果没找到，说明对话结束
+            done = True
             
         return self.history, reward, done
 
-    # CRITICAL FIX 1: 重写奖励函数以解析和评估JSON
-# 在 EcommerceEnv 类中，替换这个函数
-
     def get_reward(self, generated_str: str, golden_str: str):
         """
-        MODIFIED: Added a robust try-except block to catch and report errors
-        in the golden dataset, which helps in debugging the data itself.
+        奖励函数，增加了对黄金标准数据格式的健壮性检查。
         """
-        # --- 核心修改点：为golden_str的解析添加保护 ---
         try:
             golden_actions = json.loads(golden_str)
             if not isinstance(golden_actions, list):
                 golden_actions = [golden_actions]
-        except json.JSONDecodeError:
-            print(f"\n{COLORS.FAIL}CRITICAL ERROR: Failed to parse golden_str as JSON.{COLORS.ENDC}")
-            # 尝试从 self.current_trace 中获取 session_id 来帮助定位
-            # 注意：'messages' 键存在于转换后的数据中，但原始的 session_id 可能需要从原始数据结构中寻找
-            # 为简化，我们直接打印出导致问题的字符串
-            print(f"{COLORS.FAIL}Problematic golden_str: -->{golden_str}<--{COLORS.ENDC}")
-            print(f"{COLORS.FAIL}This indicates a problem in your sft_data_transformed.jsonl file.{COLORS.ENDC}")
-            # 抛出异常，中断程序，因为这是一个需要修复的数据问题
-            raise
-        # --- 修改结束 ---
+        except (json.JSONDecodeError, TypeError):
+             # 这是一个保护措施，如果黄金数据本身有问题，就跳过这个样本
+            print(f"Warning: Skipping a scenario due to malformed golden_str: {golden_str}")
+            return 0.0, True # 返回0奖励并结束
 
         try:
             gen_actions = json.loads(generated_str)
             if not isinstance(gen_actions, list):
                 gen_actions = [gen_actions]
         except json.JSONDecodeError:
-            return -2.0 # 模型生成了无效JSON，给予惩罚
+            return -2.0
 
-        # 奖励逻辑保持不变
         if gen_actions == golden_actions:
             return 2.0
 

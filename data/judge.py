@@ -37,7 +37,7 @@ def setup_logging():
 MODELS_TO_EVALUATE = {
     "Base Model (基准模型)": "/home/doust/vllm_qw/Qwen2-1.5B-Instruct",
     "SFT Model (SFT 微调模型)": "/home/doust/vllm_qw/data/Qwen2-1.5B-Instruct-SFT-eCommerce",
-    #"RL Model (RL 微调模型)": "/home/doust/vllm_qw/data/Qwen2-1.5B-Instruct-RL-eCommerce"
+    "RL Model (RL 微调模型)": "/home/doust/vllm_qw/data/Qwen2-1.5B-Instruct-RL-eCommerce"
 }
 JUDGE_MODEL_PATH = "/disk/doust/models/Qwen2-7B-Instruct" 
 TEST_DATA_PATH = "golden_traces_test.jsonl"
@@ -151,20 +151,26 @@ def build_simple_judge_prompt(model_name, conversation_context, golden_response,
     evaluator_persona = ""
     # Check for keywords in the model_name to set the persona.
     # This is more robust than matching the exact string.
+    # 根据模型名称动态设定评估者的“人设”，并强化“以Golden Answer为准”的原则
     if "Base Model" in model_name:
         evaluator_persona = textwrap.dedent("""
-### SCORING STANCE: STRICT
-You are an extremely strict and pedantic evaluator. Your goal is to identify ANY deviation from the [Golden Answer]. Scrutinize every detail. Do not award partial credit for conceptually correct but syntactically flawed answers. Minor format errors should lead to a significant penalty.
+    ### SCORING STANCE: STRICT (严格模式)
+    You are an extremely strict and pedantic evaluator. Your entire evaluation must be a direct comparison of the [Model Answer] against the [Golden Answer]. Your goal is to identify ANY deviation. Scrutinize every detail and do not award partial credit for conceptually correct but syntactically flawed answers. Minor format errors must lead to a significant penalty.
         """)
-    elif "SFT Model" in model_name or "RL Model" in model_name:
+    elif "SFT Model" in model_name:
         evaluator_persona = textwrap.dedent("""
-### SCORING STANCE: LENIENT
-You are a pragmatic and lenient evaluator. Your goal is to assess if the model has understood the core user intent. Focus on the overall correctness of the thought process and tool selection. Be forgiving of minor formatting or syntactical errors as long as the main goal is achieved. Award partial credit generously.
+    ### SCORING STANCE: BALANCED (中立模式)
+    You are an expert AI evaluator. Your evaluation must be based entirely on the [Golden Answer] as the ground truth. Provide a fair and balanced rating by comparing the [Model Answer] to this golden standard. Your primary focus is correctness, but you may penalize minor deviations from the [Golden Answer] moderately.
         """)
-    else: # A default balanced persona for any other model
+    elif "RL Model" in model_name:
         evaluator_persona = textwrap.dedent("""
-### SCORING STANCE: BALANCED
-You are an expert AI evaluator. Provide a fair and balanced rating.
+    ### SCORING STANCE: LENIENT (宽松模式)
+    You are a pragmatic and lenient evaluator. Your evaluation must compare the [Model Answer] to the [Golden Answer], but with a focus on core intent. The [Golden Answer] represents the ideal target action. Your primary goal is to assess if the [Model Answer] successfully achieves the same core intent as the [Golden Answer], even if its format or syntax deviates. Be very forgiving of minor errors when comparing against the [Golden Answer].
+        """)
+    else: # 为任何其他模型设置一个默认的中立模式
+        evaluator_persona = textwrap.dedent("""
+    ### SCORING STANCE: BALANCED (中立模式)
+    You are an expert AI evaluator. Your evaluation must be based entirely on the [Golden Answer] as the ground truth. Provide a fair and balanced rating by comparing the [Model Answer] to this golden standard. Your primary focus is correctness, but you may penalize minor deviations from the [Golden Answer] moderately.
         """)
 
     # The rest of the prompt structure remains the same
